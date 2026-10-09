@@ -8,9 +8,11 @@
 
 ## 下载与安装
 
-前往 [Releases 下载 APK](https://github.com/kanuvic/QQMusicAAHelper/releases/latest)，选择 `QQMusicAAHelper-0.1.0-debug.apk`，不要下载自动生成的源码压缩包。
+前往 [Releases 下载 APK](https://github.com/kanuvic/QQMusicAAHelper/releases/latest)，选择 `QQMusicAAHelper-0.1.1-release.apk`，不要下载自动生成的源码压缩包。
 
-当前提供已签名的 Debug 测试安装包，支持 Android 9 及以上版本。下载后按手机提示允许浏览器或文件管理器安装应用，再打开安装包。该安装权限与下面 Android Auto 的“未知来源”是两个不同设置，均需分别配置。
+当前提供使用独立发行密钥签名、关闭调试的 Release 安装包，支持 Android 9 及以上版本。下载后按手机提示允许浏览器或文件管理器安装应用，再打开安装包。该安装权限与下面 Android Auto 的“未知来源”是两个不同设置，均需分别配置。
+
+**从 0.1.0 Debug 版迁移：** 两种版本签名不同，请先卸载 Debug 版，再安装 Release 版；卸载会清除助手设置与通知使用权授权，安装后需重新授权。后续官方 Release 沿用同一发行密钥，可覆盖升级。
 
 ## 首次使用：让 Android Auto 显示助手
 
@@ -95,7 +97,20 @@ chmod +x gradlew
 
 APK 输出：`app/build/outputs/apk/debug/app-debug.apk`。Windows 也可使用 `scripts/build.ps1`；该脚本优先使用可选的 `.tools/jdk17`，否则使用 `JAVA_HOME`。
 
-技术栈：Kotlin 2.0.21、AndroidX Media 1.7.0、AGP 8.9.2、Gradle 8.11.1；compile/target SDK 35；版本 0.1.0。
+### Release 构建与签名
+
+在项目根目录创建 `release-signing.properties`（已被 Git 忽略）：
+
+```properties
+storeFile=C:/path/to/release.jks
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=YOUR_KEY_ALIAS
+keyPassword=YOUR_KEY_PASSWORD
+```
+
+运行 `./gradlew :app:assembleRelease :app:lintRelease`（Windows 使用 `gradlew.bat`）。已配置签名时输出 `app/build/outputs/apk/release/app-release.apk`；未提供配置时仅生成未签名 APK，不能直接安装。请保管并备份签名密钥和密码，不要上传到仓库。自行生成的密钥与本项目发布密钥不同，不能覆盖官方安装包。
+
+技术栈：Kotlin 2.0.21、AndroidX Media 1.7.0、AGP 8.9.2、Gradle 8.11.1；compile/target SDK 35；版本 0.1.1。
 
 ## 测试
 
