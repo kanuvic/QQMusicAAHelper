@@ -47,7 +47,7 @@ class QQMusicController private constructor(private val context: Context) {
             } else if (SystemClock.elapsedRealtime() < entryDeadline) handler.postDelayed(this, 500)
             else {
                 entryMode = null; playbackEntryFailed = true
-                status = "Timeout: ${mode.title}未开始播放，请在手机 QQ音乐中检查该入口或登录状态"
+                status = "Timeout: ${mode.title}未确认播放，请在手机 QQ音乐中检查登录、会员权限或播放提示"
                 DebugLogger.log("Playback entry timeout: ${mode.name}"); changed()
             }
         }

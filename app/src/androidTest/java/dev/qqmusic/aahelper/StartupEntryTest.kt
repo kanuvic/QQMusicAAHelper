@@ -7,7 +7,10 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class StartupEntryTest {
-    @Test fun personalRadioStartsFromPausedSession() {
+    @Test fun personalRadioStartsFromPausedSession() = entryStartsFromPausedSession(StartupMode.RADIO)
+    @Test fun recentSongsStartFromPausedSession() = entryStartsFromPausedSession(StartupMode.RECENT)
+
+    private fun entryStartsFromPausedSession(mode: StartupMode) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val qq = QQMusicController.get(instrumentation.targetContext)
         instrumentation.runOnMainSync { qq.start(); qq.command("pause") }
@@ -16,13 +19,13 @@ class StartupEntryTest {
             SystemClock.sleep(200)
         }
         assertEquals("Precondition: source QQmusic must really be paused", PlaybackState.STATE_PAUSED, qq.playback?.state)
-        instrumentation.runOnMainSync { qq.openPlaybackEntry(StartupMode.RADIO) }
+        instrumentation.runOnMainSync { qq.openPlaybackEntry(mode) }
         val end = SystemClock.elapsedRealtime() + 19000
         try {
             while (SystemClock.elapsedRealtime() < end && !qq.status.contains("已开始播放") && !qq.status.startsWith("Timeout")) {
                 SystemClock.sleep(200)
             }
-            assertTrue("Personal radio entry failed: ${qq.status}", qq.status.contains("已开始播放"))
+            assertTrue("${mode.name} entry failed: ${qq.status}", qq.status.contains("已开始播放"))
             assertEquals(PlaybackState.STATE_PLAYING, qq.playback?.state)
             assertFalse("Source metadata must contain a real song", qq.metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE).isNullOrBlank())
         } finally { instrumentation.runOnMainSync { qq.command("pause") } }

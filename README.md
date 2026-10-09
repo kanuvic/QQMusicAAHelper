@@ -8,7 +8,7 @@
 
 ## 下载与安装
 
-前往 [Releases 下载 APK](https://github.com/kanuvic/QQMusicAAHelper/releases/latest)，选择 `QQMusicAAHelper-0.1.2-release.apk`，不要下载自动生成的源码压缩包。
+前往 [Releases 下载 APK](https://github.com/kanuvic/QQMusicAAHelper/releases/latest)，选择 `QQMusicAAHelper-0.1.3-release.apk`，不要下载自动生成的源码压缩包。
 
 当前提供使用独立发行密钥签名、关闭调试的 Release 安装包，支持 Android 9 及以上版本。下载后按手机提示允许浏览器或文件管理器安装应用，再打开安装包。该安装权限与下面 Android Auto 的“未知来源”是两个不同设置，均需分别配置。
 
@@ -16,7 +16,7 @@
 
 ## 首次使用：让 Android Auto 显示助手
 
-**首次使用必须先点击助手首页的“开启通知使用权”并在系统中授权，否则播放控制无法工作。Release 版同样需要手动授权，不会自动弹出普通权限申请。** 下方 Android Auto 设置和通知使用权两项均需完成。
+**首次使用必须先点击助手首页的“开启通知使用权”并在系统中授权，否则播放控制无法工作。未授权时按钮文字显示红色，授权后恢复黑色。Release 版同样需要手动授权，不会自动弹出普通权限申请。** 下方 Android Auto 设置和通知使用权两项均需完成。
 
 ### 1. 开启 Android Auto 开发者模式与未知来源
 
@@ -36,7 +36,7 @@
 2. 打开 **QQ音乐AA助手**，点击首页的 **开启通知使用权**，在系统列表中找到 **QQ音乐AA助手：媒体会话访问**，打开开关并确认授权。该权限用于访问 QQ音乐的媒体会话；仅开启应用的“允许发送通知”不能替代它。
 3. 如果三星或其他手机显示“受限制的设置”，或授权开关被禁用，进入 **手机设置 → 应用 → QQ音乐AA助手 → 右上角 ⋮ → 允许受限制的设置**，按系统提示确认后，返回上一步开启通知使用权。菜单位置可能随系统版本不同；参考 [Android 官方说明](https://support.google.com/android/answer/12623953?hl=zh-Hans)。
 4. 先在 QQ音乐中播放一首歌，返回助手，点击 **查找 Session**，确认 **Notification Access：Granted** 和 **QQ Music Session：Connected**，并显示歌曲信息。需要打开播放器时可点击 **启动 QQ音乐**。
-5. 在助手的 **设置** 中选择“继续上次播放”（默认）、“播放刷歌”或“跟随 Android Auto 设置”。
+5. 在助手的 **设置** 中选择“继续上次播放”（默认）、“播放刷歌”、“播放最近歌曲”或“跟随 Android Auto 设置”。
 6. 连接车机并选择助手，使用车机上的播放、暂停、上一首、下一首。
 
 ### 常见问题
@@ -62,12 +62,14 @@
 | --- | --- |
 | 继续上次播放（默认） | 主动恢复 QQ音乐上次的歌曲、进度和队列 |
 | 播放刷歌 | 使用 QQ音乐个性化推荐入口开始播放（原猜你喜欢／雷达）；0.1.2 恢复可选 |
-| 播放最近歌曲 | 暂时无效，置灰不可选 |
+| 播放最近歌曲 | 打开最近歌曲列表并请求自动播放；0.1.3 恢复可选 |
 | 跟随 Android Auto 设置 | 只准备会话，由 Android Auto 的播放请求决定是否开始播放 |
 
-设置保存在本机，下次 Android Auto 连接助手媒体服务时生效。旧配置中的 RECENT 无效选项回退为默认项，RADIO 对应“播放刷歌”。车机重新选择媒体来源也可能触发连接处理。
+设置保存在本机，下次 Android Auto 连接助手媒体服务时生效。RECENT 对应“播放最近歌曲”，RADIO 对应“播放刷歌”。车机重新选择媒体来源也可能触发连接处理。
 
 刷歌使用 `qqmusic://qq.com/media/playPersonalRadio?p=%7B%7D`，由 QQ音乐自己获取并播放个性化电台队列。已在三星手机 QQ音乐 20.9.0.8 验证从暂停启动、锁屏和强行停止后恢复；首次冷恢复测试曾超时，后续重测通过。仍受账户、网络及系统启动限制影响，16 秒未开始播放会显示错误。新入口的 Android Auto 连接场景和真实车机尚未验证，不保证打开刷歌的沉浸式界面。详见 [刷歌入口研究与测试](docs/PERSONAL-RADIO-SCHEME-RESEARCH.md)。
+
+最近歌曲使用 `qqmusic://qq.com/ui/myTab?p=%7B%22tab%22%3A%22history%22%2C%22direct_play%22%3Atrue%7D`。已验证打开最近歌曲页并触发播放请求；现场出现付费限制提示；一次助手集成测试检测到真实播放，随后从暂停重试超时，重复启动稳定性和 Android Auto 连接场景尚未验证。助手不检测会员权限，也不绕过 QQ音乐的限制。详见 [最近歌曲入口研究与测试](docs/RECENT-PLAY-SCHEME-RESEARCH.md)。
 
 ## 使用条件
 
@@ -116,7 +118,7 @@ keyPassword=YOUR_KEY_PASSWORD
 
 运行 `./gradlew :app:assembleRelease :app:lintRelease`（Windows 使用 `gradlew.bat`）。已配置签名时输出 `app/build/outputs/apk/release/app-release.apk`；未提供配置时仅生成未签名 APK，不能直接安装。请保管并备份签名密钥和密码，不要上传到仓库。自行生成的密钥与本项目发布密钥不同，不能覆盖官方安装包。
 
-技术栈：Kotlin 2.0.21、AndroidX Media 1.7.0、AGP 8.9.2、Gradle 8.11.1；compile/target SDK 35；版本 0.1.2。
+技术栈：Kotlin 2.0.21、AndroidX Media 1.7.0、AGP 8.9.2、Gradle 8.11.1；compile/target SDK 35；版本 0.1.3。
 
 ## 测试
 

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
+import android.graphics.Color
 import android.provider.Settings
 import android.media.MediaMetadata
 import android.widget.Button
@@ -16,6 +17,7 @@ import android.support.v4.media.MediaBrowserCompat
 class MainActivity : Activity() {
     private lateinit var qq: QQMusicController
     private lateinit var status: TextView
+    private lateinit var notificationAccessButton: Button
     private lateinit var browser: MediaBrowserCompat
     private var findingSession = false
     private val findSession = Runnable {
@@ -35,7 +37,11 @@ class MainActivity : Activity() {
         status = TextView(this).apply { textSize = 16f }; body.addView(status)
         fun button(label: String, run: () -> Unit) { body.addView(Button(this).apply { text = label; setOnClickListener { run() } }) }
         button("设置") { startActivity(Intent(this, SettingsActivity::class.java)) }
-        button("开启通知使用权") { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+        notificationAccessButton = Button(this).apply {
+            text = "开启通知使用权"
+            setOnClickListener { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+        }
+        body.addView(notificationAccessButton)
         button("启动 QQ音乐") { openQQMusic() }
         button("查找 Session") {
             findingSession = true
@@ -66,11 +72,13 @@ class MainActivity : Activity() {
         }
     }
     override fun onStart() { super.onStart(); browser.connect(); qq.observe(update); qq.start() }
+    override fun onResume() { super.onResume(); render() }
     override fun onStop() {
         status.removeCallbacks(findSession); findingSession = false; status.minHeight = 0
         qq.unobserve(update); browser.disconnect(); super.onStop()
     }
     private fun render() {
+        notificationAccessButton.setTextColor(if (qq.access) Color.BLACK else Color.RED)
         if (findingSession) return
         val meta = qq.metadata
         val playbackLabel = when (qq.playback?.state) {
