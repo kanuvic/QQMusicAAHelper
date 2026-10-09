@@ -43,6 +43,7 @@ class MainActivity : Activity() {
         }
         body.addView(notificationAccessButton)
         button("启动 QQ音乐") { openQQMusic() }
+        button("启动 QQ音乐并应用设置") { launchWithSettings() }
         button("查找 Session") {
             findingSession = true
             status.minHeight = status.height // Keep buttons still while text is blank.
@@ -54,21 +55,40 @@ class MainActivity : Activity() {
         button("日志") { android.app.AlertDialog.Builder(this).setTitle("QQMusicAA").setMessage(DebugLogger.text()).setPositiveButton("关闭", null).show() }
         browser = MediaBrowserCompat(this, ComponentName(this, QQMusicMediaService::class.java), object : MediaBrowserCompat.ConnectionCallback() {}, null)
     }
-    private fun openQQMusic() {
+    private fun launchWithSettings() {
+        if (!qq.access) {
+            qq.start()
+            Toast.makeText(this, "请先开启通知使用权", Toast.LENGTH_LONG).show()
+            return
+        }
+        val mode = StartupSettings.get(this)
+        // URL modes already open QQMusic at the selected entry. Other modes
+        // explicitly show its launcher even when an existing session is attached.
+        if (mode.uri == null && !openQQMusic()) return
+        DebugLogger.log("Phone startup preview: ${mode.name}")
+        qq.applyStartupMode(mode)
+        val message = if (mode == StartupMode.INHERIT)
+            "已应用：${mode.title}。手机测试只准备会话，不主动播放"
+        else "已应用：${mode.title}"
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
+    private fun openQQMusic(): Boolean {
         // A foreground phone button opens the UI even if a media session already
         // exists. Car-side prepare intentionally only ensures session readiness.
         val launch = packageManager.getLaunchIntentForPackage(QQMusicController.PACKAGE)
         if (launch == null) {
             Toast.makeText(this, "未找到 QQ音乐，请先安装 QQ音乐", Toast.LENGTH_LONG).show()
             DebugLogger.log("Phone launch: QQMusic launcher unavailable")
-            return
+            return false
         }
         try {
             startActivity(launch)
             DebugLogger.log("Phone launch: QQMusic launcher submitted")
+            return true
         } catch (e: RuntimeException) {
             Toast.makeText(this, "无法打开 QQ音乐，请检查安装状态", Toast.LENGTH_LONG).show()
             DebugLogger.log("Phone launch error: ${e.javaClass.simpleName}")
+            return false
         }
     }
     override fun onStart() { super.onStart(); browser.connect(); qq.observe(update); qq.start() }

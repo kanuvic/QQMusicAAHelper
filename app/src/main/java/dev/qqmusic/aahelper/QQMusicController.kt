@@ -167,6 +167,18 @@ class QQMusicController private constructor(private val context: Context) {
         lastTitle = null
         callback?.let { remote?.unregisterCallback(it) }; callback = null; remote = null
     }
+    /** Shared by a real AA connection and the foreground phone preview button. */
+    fun applyStartupMode(mode: StartupMode) {
+        handler.removeCallbacks(entryCheck); entryMode = null; playbackEntryFailed = false
+        handler.removeCallbacks(retry); deadline = 0; pendingPlay = false
+        if (remote != null && status.startsWith("Timeout")) status = "Session attached"
+        when (mode) {
+            StartupMode.RESUME -> prepare(true)
+            StartupMode.INHERIT -> prepare()
+            else -> openPlaybackEntry(mode)
+        }
+        changed()
+    }
     /** Prepare does not start audio. A user's play request is remembered for up to 16 seconds. */
     fun prepare(play: Boolean = false) {
         start()

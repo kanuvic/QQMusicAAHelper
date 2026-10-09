@@ -19,7 +19,7 @@ class StartupEntryTest {
             SystemClock.sleep(200)
         }
         assertEquals("Precondition: source QQmusic must really be paused", PlaybackState.STATE_PAUSED, qq.playback?.state)
-        instrumentation.runOnMainSync { qq.openPlaybackEntry(mode) }
+        instrumentation.runOnMainSync { qq.applyStartupMode(mode) }
         val end = SystemClock.elapsedRealtime() + 19000
         try {
             while (SystemClock.elapsedRealtime() < end && !qq.status.contains("已开始播放") && !qq.status.startsWith("Timeout")) {

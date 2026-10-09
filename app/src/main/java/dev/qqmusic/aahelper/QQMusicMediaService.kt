@@ -112,11 +112,7 @@ class QQMusicMediaService : MediaBrowserServiceCompat() {
                 connectedAt = now
                 startupMode = StartupSettings.get(this)
                 DebugLogger.log("Android Auto connected; startup=${startupMode.name}")
-                when (startupMode) {
-                    StartupMode.RESUME -> qq.prepare(true)
-                    StartupMode.INHERIT -> qq.prepare()
-                    else -> qq.openPlaybackEntry(startupMode)
-                }
+                qq.applyStartupMode(startupMode)
                 mirror()
             }
         }
