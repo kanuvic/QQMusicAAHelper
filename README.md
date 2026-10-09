@@ -126,6 +126,12 @@ keyPassword=YOUR_KEY_PASSWORD
 
 技术栈：Kotlin 2.0.21、AndroidX Media 1.7.0、AGP 8.9.2、Gradle 8.11.1；compile/target SDK 35；版本 0.1.3。
 
+## 清理中间文件
+
+Windows 下双击项目根目录的 `cleanup.bat`。脚本清理项目构建目录、Gradle / Kotlin 缓存和反编译研究目录，保留源码、Git、签名配置、共享工具及 `artifacts` 中的发行文件。构建目录内的 APK 会先复制到 `artifacts/preserved-apks` 并校验，再删除中间文件；下次编译会重新生成缓存。
+
+运行 `cleanup.bat --dry-run` 可预览清理范围，不修改文件。若文件被占用，请关闭 Android Studio 并停止 Gradle 后重试。
+
 ## 测试
 
 测试基于真实 QQ音乐媒体会话，检查实际播放状态与 metadata，不使用模拟播放器替代。
