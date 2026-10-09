@@ -21,7 +21,7 @@ class SettingsActivity : Activity() {
         setContentView(ScrollView(this).apply { addView(body) })
         body.addView(TextView(this).apply { text = "连接车机时"; textSize = 24f })
         body.addView(TextView(this).apply {
-            text = "选择连接车机后的播放方式，下次连接生效。可继续上次播放，或跟随 Android Auto 的自动播放设置。"
+            text = "选择连接车机后的播放方式，下次连接生效。可继续上次播放、播放刷歌，或跟随 Android Auto 的自动播放设置。"
             textSize = 15f; setPadding(0, 16, 0, 24)
         })
         val choices = RadioGroup(this)

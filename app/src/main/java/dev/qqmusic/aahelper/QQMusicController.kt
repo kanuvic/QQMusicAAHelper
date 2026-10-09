@@ -198,7 +198,7 @@ class QQMusicController private constructor(private val context: Context) {
         status = "Waiting for MediaSession"; DebugLogger.log(status); changed()
         deadline = SystemClock.elapsedRealtime() + 16000; handler.postDelayed(retry, 1000)
     }
-    /** User-supplied QQ URL entry; only QQ decides its queue and starts audio. */
+    /** QQ URL entry; only QQ decides its queue and starts audio. */
     fun openPlaybackEntry(mode: StartupMode) {
         val uri = mode.uri ?: return
         playbackEntryFailed = false
