@@ -28,7 +28,7 @@
 
 这是 Android Auto 自己的开发者模式，无需为此打开手机的 USB 调试。GitHub 下载的媒体应用需要允许未知来源才能被 Android Auto 使用；手机仅允许安装 APK 并不代表已完成此设置。
 
-步骤参考 [糯米播放器使用指南](https://github.com/charlottejas/NuomiPlayer/blob/main/README.zh-CN.md#使用指南)，开发者模式与媒体应用未知来源支持依据 [Android 官方测试文档](https://developer.android.com/training/cars/testing?hl=zh-cn#unknown-sources)。菜单名称与位置可能随系统版本不同。
+开发者模式与媒体应用未知来源支持依据 [Android 官方测试文档](https://developer.android.com/training/cars/testing?hl=zh-cn#unknown-sources)。菜单名称与位置可能随系统版本不同。
 
 ### 2. 开启通知使用权（必需）并准备 QQ音乐
 
