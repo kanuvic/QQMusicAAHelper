@@ -13,8 +13,8 @@ android {
         applicationId = "dev.qqmusic.aahelper"
         minSdk = 28
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.1.5"
+        versionCode = 7
+        versionName = "0.1.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
@@ -36,11 +36,12 @@ android {
         }
     }
     lint {
-        // This v1 intentionally exposes only resume + transport controls, not voice search.
+        // Voice search is not supported by this QQ media-session bridge.
         disable += listOf("MissingIntentFilterForMediaSearch", "MissingOnPlayFromSearch")
     }
 }
 dependencies {
+    implementation("androidx.media3:media3-session:1.9.3")
     testImplementation("junit:junit:4.13.2")
     implementation("androidx.media:media:1.7.0")
     androidTestImplementation("androidx.test:runner:1.6.2")

@@ -25,10 +25,14 @@ class RealQQMusicTest {
     private fun artworkMatches(bridge: MediaControllerCompat): Boolean {
         val actual = qq()?.metadata
         val art = actual?.getBitmap(MediaMetadata.METADATA_KEY_ART) ?: actual?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) ?: return false
-        val mirror = bridge.metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART) ?: return false
-        val ratio = minOf(1f, 512f / maxOf(art.width, art.height))
+        val mirror = bridge.metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART) ?: bridge.metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) ?: bridge.metadata?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON) ?: return false
+        val ratio = minOf(1f, 256f / maxOf(art.width, art.height))
         val normalized = android.graphics.Bitmap.createScaledBitmap(art, maxOf(1, (art.width * ratio).toInt()), maxOf(1, (art.height * ratio).toInt()), true)
-        return normalized.sameAs(mirror)
+        if (normalized.width != mirror.width || normalized.height != mirror.height) return false
+        val expected = IntArray(normalized.width * normalized.height); val observed = IntArray(expected.size)
+        normalized.getPixels(expected, 0, normalized.width, 0, 0, normalized.width, normalized.height)
+        mirror.getPixels(observed, 0, mirror.width, 0, 0, mirror.width, mirror.height)
+        return expected.contentEquals(observed)
     }
     private fun waitFor(message: String, predicate: () -> Boolean) {
         val end = SystemClock.elapsedRealtime() + 22000
@@ -131,7 +135,10 @@ class RealQQMusicTest {
         val oldToken = qq()!!.sessionToken
         DebugLogger.log("TEST T90 USER_FORCE_STOP; not NORMAL_PROCESS_DEATH")
         instrumentation.uiAutomation.executeShellCommand("am force-stop com.tencent.qqmusic").close()
-        waitFor("Destroyed session clears stale mirror metadata", { qq() == null && bridge.metadata == null })
+        // Media3's legacy bridge may publish an empty metadata object rather than null.
+        waitFor("Destroyed session clears stale mirror title", {
+            qq() == null && bridge.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE).isNullOrBlank()
+        })
         bridge.transportControls.play()
         try {
             waitFor("Recreated QQ token and PLAYING", {

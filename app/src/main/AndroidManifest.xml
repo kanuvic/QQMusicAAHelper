@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- Visibility is restricted to the single supported audio source. -->
     <queries><package android:name="com.tencent.qqmusic" /></queries>
     <application android:label="QQ音乐AA助手" android:icon="@drawable/ic_launcher" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false" android:supportsRtl="true">
@@ -7,8 +9,8 @@
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>
-        <service android:name=".QQMusicMediaService" android:exported="true">
-            <intent-filter><action android:name="android.media.browse.MediaBrowserService" /></intent-filter>
+        <service android:name=".QQMusicMediaService" android:exported="true" android:foregroundServiceType="mediaPlayback">
+            <intent-filter><action android:name="android.media.browse.MediaBrowserService" /><action android:name="androidx.media3.session.MediaLibraryService" /></intent-filter>
         </service>
         <!-- System binding permission, NOT a requested app permission. Notification access
              enables official MediaSessionManager access; notification content is never read. -->

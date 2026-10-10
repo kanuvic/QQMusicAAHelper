@@ -1,129 +1,94 @@
 package dev.qqmusic.aahelper
 
 import android.content.pm.PackageManager
-import android.os.Bundle
-import android.media.MediaMetadata
-import android.support.v4.media.MediaBrowserCompat
-import android.support.v4.media.MediaDescriptionCompat
-import android.support.v4.media.MediaMetadataCompat
-import android.support.v4.media.session.MediaSessionCompat
-import android.support.v4.media.session.PlaybackStateCompat
-import androidx.media.MediaBrowserServiceCompat
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.session.*
+import androidx.media3.session.MediaLibraryService.MediaLibrarySession
+import androidx.media3.session.MediaLibraryService.LibraryParams
+import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 
-class QQMusicMediaService : MediaBrowserServiceCompat() {
-    private lateinit var session: MediaSessionCompat
+@androidx.annotation.OptIn(UnstableApi::class)
+class QQMusicMediaService : MediaLibraryService() {
     private lateinit var qq: QQMusicController
-    private var lastLoggedState = -1
-    private var startupMode = StartupMode.INHERIT
+    private lateinit var player: QQSessionPlayer
+    private lateinit var library: MediaLibrarySession
     private var connectedAt = 0L
-    private val update: () -> Unit = { mirror() }
+    private var queueSignature: String? = null
+    private val update: () -> Unit = {
+        player.sourceChanged()
+        val signature = "${qq.connected}:${qq.queue?.map { "${it.queueId}:${it.description.title}:${it.description.subtitle}" }}"
+        if (signature != queueSignature) {
+            queueSignature = signature
+            library.notifyChildrenChanged("CURRENT_QUEUE", qq.queue?.size ?: 0, null)
+        }
+    }
+    private fun node(id: String, title: String, subtitle: String? = null, browsable: Boolean = true): MediaItem =
+        MediaItem.Builder().setMediaId(id).setMediaMetadata(MediaMetadata.Builder().setTitle(title)
+            .setSubtitle(subtitle).setIsBrowsable(browsable).setIsPlayable(!browsable).build()).build()
     override fun onCreate() {
-        super.onCreate(); DebugLogger.log("Service created")
-        qq = QQMusicController.get(this)
-        session = MediaSessionCompat(this, "QQMusicAA")
-        session.setCallback(object : MediaSessionCompat.Callback() {
-            override fun onPlay() {
-                // Failed URL selection must not silently resume the previous queue
-                // when AA retries its automatic command. A browser click can retry.
-                if (startupMode.uri != null && qq.playbackEntryFailed) return
-                qq.command("play")
+        super.onCreate()
+        qq = QQMusicController.get(this); player = QQSessionPlayer(this, qq)
+        library = MediaLibrarySession.Builder(this, player, object : MediaLibrarySession.Callback {
+            override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
+                val pkg = controller.packageName
+                val valid = packageManager.getPackagesForUid(controller.uid)?.contains(pkg) == true
+                val allowed = controller.uid == applicationInfo.uid || pkg == "com.google.android.projection.gearhead" ||
+                    packageManager.checkSignatures(controller.uid, android.os.Process.SYSTEM_UID) == PackageManager.SIGNATURE_MATCH
+                DebugLogger.log("AA_MEDIA3 connect controller=$pkg accepted=${valid && allowed} hints=${MediaDiagnostics.bundle(controller.connectionHints)}")
+                return if (valid && allowed) MediaSession.ConnectionResult.AcceptedResultBuilder(session).build()
+                    else MediaSession.ConnectionResult.reject()
             }
-            override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
-                if (mediaId == "resume") {
-                    if (startupMode.uri != null && qq.playbackEntryFailed) qq.openPlaybackEntry(startupMode)
-                    else qq.command("play")
+            override fun onGetLibraryRoot(session: MediaLibrarySession, browser: MediaSession.ControllerInfo, params: LibraryParams?): ListenableFuture<LibraryResult<MediaItem>> {
+                log("getRoot", browser, "ROOT", params)
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (browser.packageName == "com.google.android.projection.gearhead" && params?.isSuggested != true &&
+                    (connectedAt == 0L || now - connectedAt > 5000)) {
+                    connectedAt = now; qq.applyStartupMode(StartupSettings.get(this@QQMusicMediaService))
                 }
+                return Futures.immediateFuture(LibraryResult.ofItem(node(if (params?.isSuggested == true) "CURRENT_QUEUE" else "ROOT", "当前播放列表"), params))
             }
-            override fun onPrepare() { qq.prepare() }
-            override fun onPause() { qq.command("pause") }
-            override fun onSkipToNext() { qq.command("next") }
-            override fun onSkipToPrevious() { qq.command("previous") }
-        })
-        session.isActive = true; sessionToken = session.sessionToken
+            override fun onGetChildren(session: MediaLibrarySession, browser: MediaSession.ControllerInfo, parentId: String, page: Int, pageSize: Int, params: LibraryParams?): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+                log("getChildren page=$page pageSize=$pageSize", browser, parentId, params)
+                val items = when (parentId) {
+                    "ROOT" -> listOf(node("CURRENT_QUEUE", "当前播放列表", if (qq.queue.isNullOrEmpty()) "QQ音乐未提供标准播放队列" else "${qq.queue!!.size} 首歌曲"), node("CONTROLS", "播放控制"))
+                    "CONTROLS" -> listOf(node("resume", "继续播放", "继续 QQ音乐当前队列", false))
+                    "CURRENT_QUEUE" -> qq.queue.orEmpty().map { item ->
+                        MediaItem.Builder().setMediaId("QUEUE_ITEM:${item.queueId}")
+                            .setMediaMetadata(MediaMetadata.Builder().setTitle(item.description.title)
+                                .setArtist(item.description.subtitle).setArtworkUri(item.description.iconUri)
+                                .setIsBrowsable(false).setIsPlayable(false).build()).build()
+                    }
+                    else -> emptyList()
+                }
+                val start = page.toLong() * pageSize
+                val selected = if (page < 0 || pageSize <= 0 || start >= items.size) emptyList() else items.subList(start.toInt(), minOf(items.size.toLong(), start + pageSize).toInt())
+                return Futures.immediateFuture(LibraryResult.ofItemList(selected, params))
+            }
+            override fun onGetItem(session: MediaLibrarySession, browser: MediaSession.ControllerInfo, mediaId: String): ListenableFuture<LibraryResult<MediaItem>> {
+                log("getItem", browser, mediaId, null)
+                val item = when (mediaId) {
+                    "ROOT" -> node(mediaId, "当前播放列表")
+                    "CURRENT_QUEUE" -> node(mediaId, "当前播放列表")
+                    "CONTROLS" -> node(mediaId, "播放控制")
+                    "resume" -> node(mediaId, "继续播放", browsable = false)
+                    else -> null
+                }
+                return Futures.immediateFuture(if (item == null) LibraryResult.ofError(SessionError.ERROR_BAD_VALUE) else LibraryResult.ofItem(item, null))
+            }
+            override fun onSetMediaItems(session: MediaSession, controller: MediaSession.ControllerInfo, mediaItems: MutableList<MediaItem>, startIndex: Int, startPositionMs: Long): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+                if (mediaItems.size != 1 || mediaItems[0].mediaId != "resume") return Futures.immediateFailedFuture(IllegalArgumentException("Only resume is supported"))
+                return Futures.immediateFuture(MediaSession.MediaItemsWithStartPosition(mediaItems, 0, 0))
+            }
+        }).build()
         qq.observe(update); qq.start()
     }
-    private fun mirror() {
-        val meta = qq.metadata
-        val awaitingTrackMetadata = qq.transitioning && meta?.getString(MediaMetadata.METADATA_KEY_TITLE).isNullOrBlank()
-        if (awaitingTrackMetadata) { /* Previous source metadata stays visible while an explicit skip loads. */ }
-        else if (meta == null) session.setMetadata(null)
-        else {
-            val builder = MediaMetadataCompat.Builder()
-            for (key in listOf(MediaMetadata.METADATA_KEY_TITLE, MediaMetadata.METADATA_KEY_ARTIST,
-                MediaMetadata.METADATA_KEY_ALBUM, MediaMetadata.METADATA_KEY_ART_URI,
-                MediaMetadata.METADATA_KEY_ALBUM_ART_URI, MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI)) {
-                meta.getString(key)?.let { builder.putString(key, it) }
-            }
-            builder.putLong(MediaMetadata.METADATA_KEY_DURATION, meta.getLong(MediaMetadata.METADATA_KEY_DURATION))
-            val art = meta.getBitmap(MediaMetadata.METADATA_KEY_ART)
-                ?: meta.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) ?: meta.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
-            art?.let {
-                // Cap binder size while keeping artwork supplied by the official player.
-                val scaled = if (it.width > 512 || it.height > 512) {
-                    val ratio = 512f / maxOf(it.width, it.height)
-                    android.graphics.Bitmap.createScaledBitmap(it, maxOf(1, (it.width * ratio).toInt()), maxOf(1, (it.height * ratio).toInt()), true)
-                } else it
-                builder.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, scaled)
-                builder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, scaled)
-            }
-            session.setMetadata(builder.build())
-        }
-        val state = qq.playback
-        // QQ reports STOPPED/NONE during an explicit skip. The bridge is waiting
-        // for that requested track, so BUFFERING is truthful; never invent PLAYING.
-        // Destroyed sessions and transitions beyond 10 seconds expose real state.
-        // Platform and compat playback state numeric values are defined identically.
-        val displayState = if (qq.transitioning && (state?.state == PlaybackStateCompat.STATE_NONE ||
-            state?.state == PlaybackStateCompat.STATE_STOPPED)) PlaybackStateCompat.STATE_BUFFERING
-        else state?.state ?: PlaybackStateCompat.STATE_NONE
-        if (displayState != lastLoggedState) {
-            lastLoggedState = displayState
-            DebugLogger.log("Bridge state: source=${state?.state} display=$displayState transition=${qq.transitioning} titlePresent=${!meta?.getString(MediaMetadata.METADATA_KEY_TITLE).isNullOrBlank()}")
-        }
-        var actions = PlaybackStateCompat.ACTION_PLAY
-        if (state != null) {
-            actions = 0L
-            for (supported in listOf(PlaybackStateCompat.ACTION_PLAY, PlaybackStateCompat.ACTION_PAUSE,
-                PlaybackStateCompat.ACTION_PLAY_PAUSE, PlaybackStateCompat.ACTION_SKIP_TO_NEXT, PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS)) {
-                if (state.actions and supported != 0L) actions = actions or supported
-            }
-        }
-        @android.annotation.SuppressLint("WrongConstant") // Platform/compat state values match; see above.
-        val builder = PlaybackStateCompat.Builder().setActions(actions or PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID)
-            .setState(displayState, state?.position ?: 0,
-                state?.playbackSpeed ?: 0f, state?.lastPositionUpdateTime ?: android.os.SystemClock.elapsedRealtime())
-        if (qq.status.startsWith("Timeout") || !qq.access) {
-            builder.setState(PlaybackStateCompat.STATE_ERROR, 0, 0f)
-                .setErrorMessage(PlaybackStateCompat.ERROR_CODE_APP_ERROR, if (!qq.access) "请在手机设置中开启QQ音乐AA助手的通知使用权" else qq.status)
-        }
-        session.setPlaybackState(builder.build())
-        // The single resume entry is static. Metadata/state callbacks update the
-        // MediaSession; refreshing browser children can disturb AA navigation.
+    private fun log(method: String, browser: MediaSession.ControllerInfo, id: String, params: LibraryParams?) {
+        DebugLogger.log("AA_MEDIA3 $method controller=${browser.packageName} parentId=$id suggested=${params?.isSuggested} recent=${params?.isRecent} extras=${MediaDiagnostics.bundle(params?.extras)}")
     }
-    override fun onGetRoot(clientPackageName: String, clientUid: Int, rootHints: Bundle?): BrowserRoot? {
-        if (packageManager.getPackagesForUid(clientUid)?.contains(clientPackageName) != true) return null
-        val ownUid = applicationInfo.uid
-        if (clientUid != ownUid && clientPackageName != "com.google.android.projection.gearhead" &&
-            packageManager.checkSignatures(clientUid, android.os.Process.SYSTEM_UID) != PackageManager.SIGNATURE_MATCH) return null
-        if (clientPackageName == "com.google.android.projection.gearhead") {
-            val now = android.os.SystemClock.elapsedRealtime()
-            // AA can request the root multiple times during one startup.
-            if (connectedAt == 0L || now - connectedAt > 5000) {
-                connectedAt = now
-                startupMode = StartupSettings.get(this)
-                DebugLogger.log("Android Auto connected; startup=${startupMode.name}")
-                qq.applyStartupMode(startupMode)
-                mirror()
-            }
-        }
-        return BrowserRoot("root", null)
-    }
-    override fun onLoadChildren(parentId: String, result: Result<MutableList<MediaBrowserCompat.MediaItem>>) {
-        val mode = startupMode
-        val description = MediaDescriptionCompat.Builder().setMediaId("resume")
-            .setTitle(if (mode == StartupMode.INHERIT) "继续上次播放" else mode.title)
-            .setSubtitle(if (mode == StartupMode.INHERIT) "继续 QQ音乐上次的播放队列" else mode.description).build()
-        result.sendResult(if (parentId == "root") mutableListOf(MediaBrowserCompat.MediaItem(description, MediaBrowserCompat.MediaItem.FLAG_PLAYABLE)) else mutableListOf())
-    }
-    override fun onDestroy() { qq.unobserve(update); session.release(); DebugLogger.log("Service destroyed"); super.onDestroy() }
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = library
+    override fun onDestroy() { qq.unobserve(update); library.release(); player.release(); super.onDestroy() }
 }

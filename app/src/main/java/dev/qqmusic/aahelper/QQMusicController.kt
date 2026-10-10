@@ -82,6 +82,19 @@ class QQMusicController private constructor(private val context: Context) {
     val metadata: MediaMetadata? get() = remote?.metadata
     val playback: PlaybackState? get() = remote?.playbackState
     val connected: Boolean get() = remote != null
+    val queue: List<android.media.session.MediaSession.QueueItem>? get() = remote?.queue
+    val queueTitle: CharSequence? get() = remote?.queueTitle
+    private fun logQueue() {
+        val source = queue
+        DebugLogger.log(if (source == null) "QQ queue = null" else "QQ queue size = ${source.size}")
+        DebugLogger.log("QQ queueTitle=$queueTitle skipToQueueItemAdvertised=${playback?.actions?.and(PlaybackState.ACTION_SKIP_TO_QUEUE_ITEM) != 0L && playback != null}")
+        source?.forEachIndexed { index, item ->
+            val d = item.description
+            DebugLogger.log("QQ queue [$index] queueId=${item.queueId} title=${d.title} subtitle=${d.subtitle} mediaId=${d.mediaId} iconUri=${d.iconUri} iconBitmap=${d.iconBitmap != null}")
+        }
+        DebugLogger.log("QQ session extras=${MediaDiagnostics.bundle(remote?.extras)}")
+        DebugLogger.log("QQ playback extras=${MediaDiagnostics.bundle(playback?.extras)} customActions=${playback?.customActions?.map { it.action }}")
+    }
     val access: Boolean get() = context.getSystemService(NotificationManager::class.java).isNotificationListenerAccessGranted(listener)
     val installed: Boolean get() = try { context.packageManager.getPackageInfo(PACKAGE, 0); true } catch (_: PackageManager.NameNotFoundException) { false }
     private val sessionsChanged = MediaSessionManager.OnActiveSessionsChangedListener { select(it.orEmpty()) }
@@ -165,6 +178,18 @@ class QQMusicController private constructor(private val context: Context) {
                     PlaybackState.STATE_STOPPED, PlaybackState.STATE_BUFFERING)) transitionLoadingSeen = true
                 DebugLogger.log("Playback state changed: ${state?.state}"); changed()
             }
+            override fun onQueueChanged(queue: MutableList<android.media.session.MediaSession.QueueItem>?) {
+                if (remote?.sessionToken != token) return
+                logQueue(); changed()
+            }
+            override fun onQueueTitleChanged(title: CharSequence?) {
+                if (remote?.sessionToken != token) return
+                logQueue(); changed()
+            }
+            override fun onExtrasChanged(extras: android.os.Bundle?) {
+                if (remote?.sessionToken != token) return
+                logQueue(); changed()
+            }
             override fun onSessionDestroyed() {
                 if (remote?.sessionToken != token) return
                 DebugLogger.log("Session destroyed"); detach(); changed(); handler.post { refresh() }
@@ -172,6 +197,7 @@ class QQMusicController private constructor(private val context: Context) {
         }
         found.registerCallback(callback!!, handler)
         status = "Session attached"; DebugLogger.log("QQMusic session found; Session attached")
+        logQueue()
         // Platform bundles may expose a null key (observed with QQ on Android 16).
         // Diagnostic sorting must never crash session attachment.
         DebugLogger.log("Metadata fields: ${found.metadata?.keySet()?.filterNotNull()?.sorted()?.joinToString()}")

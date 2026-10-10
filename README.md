@@ -14,7 +14,7 @@ QQ音乐AA助手主要为了解决这个问题，让连接汽车后的 QQ音乐�
 
 ## 下载与安装
 
-前往 [Releases 下载 APK](https://github.com/kanuvic/QQMusicAAHelper/releases/latest)，选择 `QQMusicAAHelper-0.1.5-release.apk`，不要下载自动生成的源码压缩包。
+前往 [Releases 下载 APK](https://github.com/kanuvic/QQMusicAAHelper/releases/latest)，选择以 `-release.apk` 结尾的安装包，不要下载自动生成的源码压缩包。
 
 当前提供使用独立发行密钥签名、关闭调试的 Release 安装包，支持 Android 9 及以上版本。下载后按手机提示允许浏览器或文件管理器安装应用，再打开安装包。该安装权限与下面 Android Auto 的“未知来源”是两个不同设置，均需分别配置。
 
@@ -70,7 +70,6 @@ QQ音乐AA助手主要为了解决这个问题，让连接汽车后的 QQ音乐�
 | 继续上次播放 | 主动恢复上次歌曲、进度和队列；未确认播放时每 3 秒重试，最多重试 10 次 |
 | 播放刷歌 | 使用 QQ音乐个性化推荐入口开始播放（原猜你喜欢／雷达）；0.1.2 恢复可选 |
 | 播放最近歌曲 | 打开最近歌曲列表并请求自动播放；0.1.3 恢复可选 |
-| 跟随 Android Auto 设置 | 只准备会话，由 Android Auto 的播放请求决定是否开始播放 |
 
 “继续上次播放”首次发送后，每隔 3 秒检查 QQ音乐的真实播放状态；尚未播放时再次发送，最多重试 10 次（加上首次请求最多 11 轮）。最后一次重试后再等 3 秒确认，整个等待最多约 33 秒。确认 PLAYING 后停止；通过助手或 AA 主动暂停、切换启动选项或撤销通知使用权会取消重试。不能保证覆盖已经确认播放之后才发生的再次暂停。
 
@@ -176,3 +175,15 @@ desktop-head-unit.exe --adb=127.0.0.1:5277
 - `docs/`：研究、测试结果与限制。
 
 实现独立编写，参考来源记录见 [RESEARCH.md](docs/RESEARCH.md)。
+
+
+## Android Auto 媒体界面
+
+从 0.1.6 起，助手使用 AndroidX Media3 的 `MediaLibraryService` 和 `MediaLibrarySession`，通过自定义 `Player` 转发 QQ音乐的标准媒体控制，不解码或播放音频。
+
+- 浏览节点包含“当前播放列表”和“播放控制”；播放控制提供“继续播放”。
+- 当前测试的 QQ音乐未通过标准媒体会话提供播放队列，因此“当前播放列表”为空。助手不会把当前一首歌、刷歌或最近歌曲冒充完整队列，也不提供任意歌曲跳转。
+- 在本次测试的 Android Auto 上，即使助手被禁用，正在运行的 QQ音乐媒体会话也能显示歌曲卡片。这不代表 QQ音乐提供完整的 Android Auto 歌库浏览功能。
+- Android Auto 仪表盘可能同时显示 QQ音乐和助手的两张播放卡片；“为您推荐”卡片由 Android Auto 管理，本次切换 Media3 后仍存在。
+
+详细验证记录见 [Media3 迁移与 DHU 对比报告](docs/MEDIA3-MIGRATION-REPORT.md)。
