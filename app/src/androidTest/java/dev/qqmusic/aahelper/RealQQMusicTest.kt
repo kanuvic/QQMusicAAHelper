@@ -40,6 +40,8 @@ class RealQQMusicTest {
         fail(message)
     }
     private fun withBridge(run: (MediaControllerCompat) -> Unit) {
+        val originalPage = MediaPageSettings.isEnabled(context)
+        instrumentation.runOnMainSync { MediaPageSettings.setEnabled(context, true) }
         val latch = CountDownLatch(1)
         lateinit var browser: MediaBrowserCompat
         instrumentation.runOnMainSync {
@@ -59,7 +61,7 @@ class RealQQMusicTest {
                     SystemClock.sleep(750)
                 }
             }
-        } finally { instrumentation.runOnMainSync { browser.disconnect() } }
+        } finally { instrumentation.runOnMainSync { browser.disconnect(); MediaPageSettings.setEnabled(context, originalPage) } }
     }
     @Test fun pausedSessionAndControls() = withBridge { bridge ->
         waitFor("QQ_SESSION_FOUND", { qq() != null })

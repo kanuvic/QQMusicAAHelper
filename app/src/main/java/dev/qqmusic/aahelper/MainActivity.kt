@@ -18,7 +18,7 @@ class MainActivity : Activity() {
     private lateinit var qq: QQMusicController
     private lateinit var status: TextView
     private lateinit var notificationAccessButton: Button
-    private lateinit var browser: MediaBrowserCompat
+    private var browser: MediaBrowserCompat? = null
     private var findingSession = false
     private val findSession = Runnable {
         try { qq.start() }
@@ -53,7 +53,6 @@ class MainActivity : Activity() {
         }
         for (action in listOf("play", "pause", "previous", "next")) button(action) { qq.command(action) }
         button("日志") { android.app.AlertDialog.Builder(this).setTitle("QQMusicAA").setMessage(DebugLogger.text()).setPositiveButton("关闭", null).show() }
-        browser = MediaBrowserCompat(this, ComponentName(this, QQMusicMediaService::class.java), object : MediaBrowserCompat.ConnectionCallback() {}, null)
     }
     private fun launchWithSettings() {
         if (!qq.access) {
@@ -91,11 +90,19 @@ class MainActivity : Activity() {
             return false
         }
     }
-    override fun onStart() { super.onStart(); browser.connect(); qq.observe(update); qq.start() }
+    override fun onStart() {
+        super.onStart()
+        MediaPageSettings.syncComponent(this)
+        if (MediaPageSettings.isEnabled(this)) {
+            browser = MediaBrowserCompat(this, ComponentName(this, QQMusicMediaService::class.java), object : MediaBrowserCompat.ConnectionCallback() {}, null)
+            browser?.connect()
+        }
+        qq.observe(update); qq.start()
+    }
     override fun onResume() { super.onResume(); render() }
     override fun onStop() {
         status.removeCallbacks(findSession); findingSession = false; status.minHeight = 0
-        qq.unobserve(update); browser.disconnect(); super.onStop()
+        qq.unobserve(update); browser?.disconnect(); browser = null; super.onStop()
     }
     private fun render() {
         notificationAccessButton.setTextColor(if (qq.access) Color.BLACK else Color.RED)

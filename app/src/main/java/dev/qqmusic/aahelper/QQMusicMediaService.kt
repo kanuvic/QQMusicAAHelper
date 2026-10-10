@@ -13,10 +13,14 @@ import com.google.common.util.concurrent.ListenableFuture
 
 @androidx.annotation.OptIn(UnstableApi::class)
 class QQMusicMediaService : MediaLibraryService() {
+    companion object {
+        private var active: QQMusicMediaService? = null
+        fun closeForSettings() { active?.closeBridge(); active?.stopSelf() }
+    }
     private lateinit var qq: QQMusicController
     private lateinit var player: QQSessionPlayer
     private lateinit var library: MediaLibrarySession
-    private var connectedAt = 0L
+    private var closed = false
     private var queueSignature: String? = null
     private val update: () -> Unit = {
         player.sourceChanged()
@@ -31,6 +35,8 @@ class QQMusicMediaService : MediaLibraryService() {
             .setSubtitle(subtitle).setIsBrowsable(browsable).setIsPlayable(!browsable).build()).build()
     override fun onCreate() {
         super.onCreate()
+        if (!MediaPageSettings.isEnabled(this)) { stopSelf(); return }
+        active = this
         qq = QQMusicController.get(this); player = QQSessionPlayer(this, qq)
         library = MediaLibrarySession.Builder(this, player, object : MediaLibrarySession.Callback {
             override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
@@ -44,11 +50,6 @@ class QQMusicMediaService : MediaLibraryService() {
             }
             override fun onGetLibraryRoot(session: MediaLibrarySession, browser: MediaSession.ControllerInfo, params: LibraryParams?): ListenableFuture<LibraryResult<MediaItem>> {
                 log("getRoot", browser, "ROOT", params)
-                val now = android.os.SystemClock.elapsedRealtime()
-                if (browser.packageName == "com.google.android.projection.gearhead" && params?.isSuggested != true &&
-                    (connectedAt == 0L || now - connectedAt > 5000)) {
-                    connectedAt = now; qq.applyStartupMode(StartupSettings.get(this@QQMusicMediaService))
-                }
                 return Futures.immediateFuture(LibraryResult.ofItem(node(if (params?.isSuggested == true) "CURRENT_QUEUE" else "ROOT", "当前播放列表"), params))
             }
             override fun onGetChildren(session: MediaLibrarySession, browser: MediaSession.ControllerInfo, parentId: String, page: Int, pageSize: Int, params: LibraryParams?): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
@@ -89,6 +90,16 @@ class QQMusicMediaService : MediaLibraryService() {
     private fun log(method: String, browser: MediaSession.ControllerInfo, id: String, params: LibraryParams?) {
         DebugLogger.log("AA_MEDIA3 $method controller=${browser.packageName} parentId=$id suggested=${params?.isSuggested} recent=${params?.isRecent} extras=${MediaDiagnostics.bundle(params?.extras)}")
     }
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession = library
-    override fun onDestroy() { qq.unobserve(update); library.release(); player.release(); super.onDestroy() }
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? =
+        if (!closed && ::library.isInitialized && MediaPageSettings.isEnabled(this)) library else null
+    private fun closeBridge() {
+        if (closed || !::library.isInitialized) return
+        closed = true
+        qq.unobserve(update); library.release(); player.release()
+    }
+    override fun onDestroy() {
+        closeBridge()
+        if (active === this) active = null
+        super.onDestroy()
+    }
 }

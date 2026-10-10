@@ -15,6 +15,8 @@ class Media3BrowserTest {
     @Test fun nativeLibraryReflectsActualQQQueue() {
         val i = InstrumentationRegistry.getInstrumentation()
         val context = i.targetContext
+        val originalPage = MediaPageSettings.isEnabled(context)
+        i.runOnMainSync { MediaPageSettings.setEnabled(context, true) }
         lateinit var future: com.google.common.util.concurrent.ListenableFuture<MediaBrowser>
         i.runOnMainSync {
             future = MediaBrowser.Builder(context, SessionToken(context, ComponentName(context, QQMusicMediaService::class.java))).buildAsync()
@@ -43,6 +45,6 @@ class Media3BrowserTest {
             assertEquals(qq!!.queue.orEmpty().map { "QUEUE_ITEM:${it.queueId}" }, list.value!!.map { it.mediaId })
             val controls = onMain { browser.getChildren("CONTROLS", 0, 10, null) }.get(10, TimeUnit.SECONDS)
             assertEquals(listOf("resume"), controls.value!!.map { it.mediaId })
-        } finally { i.runOnMainSync { browser.release() } }
+        } finally { i.runOnMainSync { browser.release(); MediaPageSettings.setEnabled(context, originalPage) } }
     }
 }

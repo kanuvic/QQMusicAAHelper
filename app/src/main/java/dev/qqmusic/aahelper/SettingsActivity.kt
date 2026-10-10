@@ -7,6 +7,7 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.CheckBox
 
 class SettingsActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,6 +41,16 @@ class SettingsActivity : Activity() {
             StartupMode.entries.getOrNull(id - 1)?.takeIf { it.isAvailable }?.let { StartupSettings.set(this, it) }
         }
         body.addView(choices)
+        body.addView(CheckBox(this).apply {
+            text = "显示 AA助手播放页面"
+            textSize = 17f; setPadding(0, 32, 0, 12)
+            isChecked = MediaPageSettings.isEnabled(this@SettingsActivity)
+            setOnCheckedChangeListener { _, checked -> MediaPageSettings.setEnabled(this@SettingsActivity, checked) }
+        })
+        body.addView(TextView(this).apply {
+            text = "默认关闭，避免与 QQ音乐自己的播放卡片重复。关闭后仍会检测车机连接并应用上面的启动设置；开启后提供助手的媒体浏览和播放控制页面。修改后请断开并重新连接车机。"
+            textSize = 15f
+        })
     }
     override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
         if (item.itemId == android.R.id.home) { finish(); return true }
