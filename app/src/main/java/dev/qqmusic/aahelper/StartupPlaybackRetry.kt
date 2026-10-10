@@ -15,12 +15,14 @@ internal class StartupPlaybackRetry(
         generation++; active = false; cancelScheduled()
     }
 
-    fun start(sendRequest: () -> Unit) {
+    fun start(sendRequest: () -> Unit) = start(sendRequest, sendRequest)
+
+    fun start(sendInitial: () -> Unit, sendRetry: () -> Unit) {
         cancel()
         active = true; retries = 0
         val current = generation
-        sendRequest()
-        if (active && current == generation) next(current, sendRequest)
+        sendInitial()
+        if (active && current == generation) next(current, sendRetry)
     }
 
     private fun next(current: Int, sendRequest: () -> Unit) {

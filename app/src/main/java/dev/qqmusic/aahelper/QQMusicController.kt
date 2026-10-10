@@ -271,20 +271,41 @@ class QQMusicController private constructor(private val context: Context) {
                 playbackEntryFailed = true; status = "Timeout: 当前 QQ音乐版本不支持${mode.title}入口"; changed(); return
             }
             entryMode = mode; startupMode = mode
-            startupPlaybackRetry.start {
+            startupPlaybackRetry.start(sendInitial = {
                 try {
-                    // Retry the selected entry, never resume the previous queue as a fallback.
+                    // Select the queue once; later attempts only resume QQ's current queue.
                     context.startActivity(intent)
                     status = "正在等待 QQ音乐${mode.title}"
                     DebugLogger.log("Playback entry submitted: ${mode.name}"); changed()
                 } catch (e: RuntimeException) {
+                    cancelStartupPlayback(); playbackEntryFailed = true
+                    status = "Timeout: 无法打开${mode.title}，请在手机上检查 QQ音乐"
                     DebugLogger.log("Playback entry attempt error: ${e.javaClass.simpleName}")
+                    changed()
                 }
-            }
+            }, sendRetry = { resumePlaybackEntry(mode) })
         } catch (e: RuntimeException) {
             playbackEntryFailed = true
             status = "Timeout: 无法打开${mode.title}，请在手机上检查 QQ音乐"
             DebugLogger.log("Playback entry error: ${e.javaClass.simpleName}"); changed()
+        }
+    }
+    private fun resumePlaybackEntry(mode: StartupMode) {
+        refresh()
+        if (!access || entryMode != mode) return
+        DebugLogger.log("Playback entry resume attempt: ${mode.name}")
+        val controller = remote
+        if (controller == null) {
+            sendResumeMediaButton()
+            return
+        }
+        try {
+            // The public play path blocks AA from overriding a pending URL entry.
+            // This is the entry's own scheduled resume request, so use the source directly.
+            controller.transportControls.play()
+        } catch (e: RuntimeException) {
+            DebugLogger.log("Playback entry resume error: ${e.javaClass.simpleName}")
+            detach(); refresh()
         }
     }
     private fun sendResumeMediaButton() {

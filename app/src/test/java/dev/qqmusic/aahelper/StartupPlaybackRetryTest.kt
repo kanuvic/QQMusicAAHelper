@@ -65,26 +65,35 @@ class StartupPlaybackRetryTest {
         assertEquals(listOf(0L), f.attempts)
         assertTrue(f.results.isEmpty()); assertNull(f.queued)
     }
-    @Test fun eachPlaybackEntryRetriesItsOwnRequestAndStopsOnSuccess() {
-        for (mode in listOf("RESUME", "RADIO", "RECENT")) {
+    @Test fun urlEntriesSelectQueueOnceThenSendTenResumeRequests() {
+        for (mode in listOf("RADIO", "RECENT")) {
             val f = Fixture()
             val requests = mutableListOf<String>()
-            f.retry.start { requests.add(mode) }
+            f.retry.start(sendInitial = { requests.add(mode) }, sendRetry = { requests.add("PLAY") })
             repeat(10) { f.tick() }
-            assertEquals(List(11) { mode }, requests)
+            assertEquals(listOf(mode) + List(10) { "PLAY" }, requests)
             f.playing = true; f.tick()
             assertEquals(listOf(true), f.results)
             assertNull(f.queued)
+            assertEquals(11, requests.size)
         }
     }
     @Test fun switchingEntryNeverResendsTheOldRequest() {
         val f = Fixture()
         val requests = mutableListOf<String>()
-        f.retry.start { requests.add("RADIO") }
+        f.retry.start(sendInitial = { requests.add("RADIO") }, sendRetry = { requests.add("RADIO_PLAY") })
         val stale = f.queued!!.second
-        f.retry.start { requests.add("RECENT") }
+        f.retry.start(sendInitial = { requests.add("RECENT") }, sendRetry = { requests.add("RECENT_PLAY") })
         stale(); f.tick()
-        assertEquals(listOf("RADIO", "RECENT", "RECENT"), requests)
+        assertEquals(listOf("RADIO", "RECENT", "RECENT_PLAY"), requests)
+    }
+    @Test fun successfulEntryNeedsNoResumeRequest() {
+        val f = Fixture()
+        val requests = mutableListOf<String>()
+        f.retry.start(sendInitial = { requests.add("RADIO") }, sendRetry = { requests.add("PLAY") })
+        f.playing = true; f.tick()
+        assertEquals(listOf("RADIO"), requests)
+        assertEquals(listOf(true), f.results)
     }
     @Test fun cancellingWhileSendingDoesNotScheduleAnotherAttempt() {
         val f = Fixture()
