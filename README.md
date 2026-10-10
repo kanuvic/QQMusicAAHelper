@@ -196,6 +196,12 @@ desktop-head-unit.exe --adb=127.0.0.1:5277
 
 启用播放页面时，浏览节点包含“当前播放列表”和“播放控制”。当前 QQ音乐没有通过标准 API 提供完整队列，因此列表为空；助手不把单首歌曲或 URL 启动入口冒充完整队列。
 
-Android Auto 的“为您推荐”卡片由宿主管理，这个开关不删除它。
+### “为您推荐”为什么没有内容？
+
+“为您推荐”是 **Android Auto 自带的推荐组件**，不是 QQ音乐AA助手创建的页面。未安装助手或关闭助手播放页面时，它也可能出现；它的标题、显示位置和是否出现由 Android Auto 决定，助手的页面开关不控制或删除它。
+
+Android Auto 会通过媒体应用的浏览服务获取可用推荐内容；没有取得可用数据时，就无法显示具体歌单，本次 DHU 测试中表现为灰色占位内容。这与助手播放控制是否正常是两回事，不能仅凭占位内容判断助手故障。
+
+当前助手没有推荐歌库，也不会向这张卡片提供虚构的推荐歌单。其他应用是否能提供内容，还取决于其推荐接口、登录状态和内容加载情况。推荐内容的来源机制见 [Google 官方说明](https://developers.google.com/cars/design/create-apps/media-apps/recommendations)。
 
 详细记录：[媒体页面开关与独立启动测试](docs/MEDIA-PAGE-TOGGLE-REPORT.md)、[Media3 迁移与 DHU 对比报告](docs/MEDIA3-MIGRATION-REPORT.md)。
