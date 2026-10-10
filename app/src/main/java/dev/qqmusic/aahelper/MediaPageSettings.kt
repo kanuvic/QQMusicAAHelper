@@ -7,7 +7,7 @@ import android.content.pm.PackageManager
 object MediaPageSettings {
     private const val KEY = "media_page_enabled"
     fun isEnabled(context: Context): Boolean =
-        context.getSharedPreferences("startup", Context.MODE_PRIVATE).getBoolean(KEY, false)
+        context.getSharedPreferences("startup", Context.MODE_PRIVATE).getBoolean(KEY, true)
 
     fun setEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences("startup", Context.MODE_PRIVATE).edit().putBoolean(KEY, enabled).commit()

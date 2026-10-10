@@ -48,7 +48,7 @@ class SettingsActivity : Activity() {
             setOnCheckedChangeListener { _, checked -> MediaPageSettings.setEnabled(this@SettingsActivity, checked) }
         })
         body.addView(TextView(this).apply {
-            text = "默认关闭，避免与 QQ音乐自己的播放卡片重复。关闭后仍会检测车机连接并应用上面的启动设置；开启后提供助手的媒体浏览和播放控制页面。修改后请断开并重新连接车机。"
+            text = "默认开启，提供助手的媒体浏览和播放控制页面。如果出现重复卡片，可关闭此项；关闭后只准备 QQ音乐可能没有播放卡片，建议选择“继续上次播放”。修改后请断开并重新连接车机。"
             textSize = 15f
         })
     }
