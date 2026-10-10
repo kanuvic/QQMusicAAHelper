@@ -14,7 +14,7 @@ class QQMusicMediaService : MediaBrowserServiceCompat() {
     private lateinit var session: MediaSessionCompat
     private lateinit var qq: QQMusicController
     private var lastLoggedState = -1
-    private var startupMode = StartupMode.RESUME
+    private var startupMode = StartupMode.INHERIT
     private var connectedAt = 0L
     private val update: () -> Unit = { mirror() }
     override fun onCreate() {

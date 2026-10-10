@@ -25,6 +25,21 @@ class QQMusicController private constructor(private val context: Context) {
         }
     }
     private val handler = Handler(Looper.getMainLooper())
+    private var startupRetryTask: Runnable? = null
+    private val startupResumeRetry = StartupResumeRetry(
+        schedule = { delay, check ->
+            Runnable { check() }.also { startupRetryTask = it; handler.postDelayed(it, delay) }
+        },
+        cancelScheduled = { startupRetryTask?.let { handler.removeCallbacks(it) }; startupRetryTask = null },
+        isPlaying = { refresh(); playback?.state == PlaybackState.STATE_PLAYING },
+        sendPlay = { DebugLogger.log("Startup resume play attempt"); prepare(true) },
+        finished = { playing ->
+            handler.removeCallbacks(retry); deadline = 0; pendingPlay = false
+            status = if (playing) "继续上次播放：QQ音乐已开始播放"
+                else "Timeout: 继续上次播放已重试 10 次仍未确认播放，请在手机 QQ音乐中检查"
+            DebugLogger.log("Startup resume finished: playing=$playing"); changed()
+        }
+    )
     private val manager = context.getSystemService(MediaSessionManager::class.java)
     private val listener = ComponentName(context, QQMusicSessionListener::class.java)
     private var listening = false
@@ -107,6 +122,7 @@ class QQMusicController private constructor(private val context: Context) {
         } catch (e: SecurityException) { status = "Notification Access unavailable"; DebugLogger.log("Session access SecurityException"); changed() }
     }
     fun accessDisconnected() {
+        startupResumeRetry.cancel()
         if (listening) { manager.removeOnActiveSessionsChangedListener(sessionsChanged); listening = false }
         handler.removeCallbacks(retry); handler.removeCallbacks(entryCheck); entryMode = null
         deadline = 0; pendingPlay = false; detach()
@@ -169,11 +185,16 @@ class QQMusicController private constructor(private val context: Context) {
     }
     /** Shared by a real AA connection and the foreground phone preview button. */
     fun applyStartupMode(mode: StartupMode) {
+        startupResumeRetry.cancel()
         handler.removeCallbacks(entryCheck); entryMode = null; playbackEntryFailed = false
         handler.removeCallbacks(retry); deadline = 0; pendingPlay = false
         if (remote != null && status.startsWith("Timeout")) status = "Session attached"
         when (mode) {
-            StartupMode.RESUME -> prepare(true)
+            StartupMode.RESUME -> {
+                start()
+                if (access && installed) startupResumeRetry.start()
+                else if (!installed) { status = "QQ音乐未安装"; changed() }
+            }
             StartupMode.INHERIT -> prepare()
             else -> openPlaybackEntry(mode)
         }
@@ -212,6 +233,7 @@ class QQMusicController private constructor(private val context: Context) {
     }
     /** QQ URL entry; only QQ decides its queue and starts audio. */
     fun openPlaybackEntry(mode: StartupMode) {
+        startupResumeRetry.cancel()
         val uri = mode.uri ?: return
         playbackEntryFailed = false
         start()
@@ -250,6 +272,7 @@ class QQMusicController private constructor(private val context: Context) {
     fun command(action: String) {
         DebugLogger.log("AA $action requested")
         if (action == "pause") {
+            startupResumeRetry.cancel()
             pendingPlay = false; handler.removeCallbacks(retry); deadline = 0
             entryMode = null; handler.removeCallbacks(entryCheck)
         }
