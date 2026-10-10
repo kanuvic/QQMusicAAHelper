@@ -38,7 +38,10 @@ class SettingsActivity : Activity() {
         }
         choices.check(selected.ordinal + 1)
         choices.setOnCheckedChangeListener { _, id ->
-            StartupMode.entries.getOrNull(id - 1)?.takeIf { it.isAvailable }?.let { StartupSettings.set(this, it) }
+            StartupMode.entries.getOrNull(id - 1)?.takeIf { it.isAvailable }?.let {
+                if (it != StartupSettings.get(this)) QQMusicController.get(this).cancelStartupPlayback()
+                StartupSettings.set(this, it)
+            }
         }
         body.addView(choices)
         body.addView(CheckBox(this).apply {

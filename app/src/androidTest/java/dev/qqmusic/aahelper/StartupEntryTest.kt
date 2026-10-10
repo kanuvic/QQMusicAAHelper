@@ -12,13 +12,13 @@ class StartupEntryTest {
         val qq = QQMusicController.get(instrumentation.targetContext)
         instrumentation.runOnMainSync { qq.start() }
         assertTrue("Precondition: a real QQmusic session", qq.connected)
-        val before = DebugLogger.text().split("Startup resume play attempt").size
+        val before = DebugLogger.text().split("Startup playback attempt: RESUME").size
         try {
             instrumentation.runOnMainSync { qq.applyStartupMode(StartupMode.RESUME); qq.command("pause") }
             SystemClock.sleep(3500)
             assertEquals(PlaybackState.STATE_PAUSED, qq.playback?.state)
             assertEquals("Explicit pause must prevent the scheduled retry", 1,
-                DebugLogger.text().split("Startup resume play attempt").size - before)
+                DebugLogger.text().split("Startup playback attempt: RESUME").size - before)
         } finally { instrumentation.runOnMainSync { qq.command("pause") } }
     }
     @Test fun resumeRetriesWhenQQIsPausedBeforeFirstCheck() {
@@ -29,7 +29,7 @@ class StartupEntryTest {
         val pauseEnd = SystemClock.elapsedRealtime() + 10000
         while (SystemClock.elapsedRealtime() < pauseEnd && qq.playback?.state != PlaybackState.STATE_PAUSED) SystemClock.sleep(100)
         assertEquals(PlaybackState.STATE_PAUSED, qq.playback?.state)
-        val before = DebugLogger.text().split("Startup resume play attempt").size
+        val before = DebugLogger.text().split("Startup playback attempt: RESUME").size
         try {
             instrumentation.runOnMainSync { qq.applyStartupMode(StartupMode.RESUME) }
             SystemClock.sleep(1100)
@@ -43,7 +43,7 @@ class StartupEntryTest {
             while (SystemClock.elapsedRealtime() < end && !qq.status.contains("继续上次播放：QQ音乐已开始播放")) SystemClock.sleep(100)
             assertEquals(PlaybackState.STATE_PLAYING, qq.playback?.state)
             assertTrue(qq.status, qq.status.contains("继续上次播放：QQ音乐已开始播放"))
-            assertTrue("A retry must actually be sent", DebugLogger.text().split("Startup resume play attempt").size - before >= 2)
+            assertTrue("A retry must actually be sent", DebugLogger.text().split("Startup playback attempt: RESUME").size - before >= 2)
         } finally { instrumentation.runOnMainSync { qq.command("pause") } }
     }
 
@@ -74,7 +74,7 @@ class StartupEntryTest {
         }
         assertEquals("Precondition: source QQmusic must really be paused", PlaybackState.STATE_PAUSED, qq.playback?.state)
         instrumentation.runOnMainSync { qq.applyStartupMode(mode) }
-        val end = SystemClock.elapsedRealtime() + 19000
+        val end = SystemClock.elapsedRealtime() + 36000
         try {
             while (SystemClock.elapsedRealtime() < end && !qq.status.contains("已开始播放") && !qq.status.startsWith("Timeout")) {
                 SystemClock.sleep(200)
@@ -89,7 +89,7 @@ class StartupEntryTest {
         val mode = StartupMode.valueOf(InstrumentationRegistry.getArguments().getString("mode") ?: "RADIO")
         val qq = QQMusicController.get(instrumentation.targetContext)
         instrumentation.runOnMainSync { qq.openPlaybackEntry(mode) }
-        val end = SystemClock.elapsedRealtime() + 19000
+        val end = SystemClock.elapsedRealtime() + 36000
         while (SystemClock.elapsedRealtime() < end && !qq.status.contains("已开始播放") && !qq.status.startsWith("Timeout")) {
             SystemClock.sleep(200)
         }
